@@ -1,3 +1,4 @@
 Adafruit_DHT
 RPi.GPIO
 streamlit
+pandas
