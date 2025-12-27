@@ -161,7 +161,7 @@ metrics_container = st.container()
 chart_container = st.container()
 alerts_container = st.container()
 
-# Optional: LED / buzzer pins
+# LED & buzzer pins
 BUZZER_PIN = 22
 LED_PIN = 23
 GPIO.setup(BUZZER_PIN, GPIO.OUT)
@@ -177,20 +177,20 @@ def alarm_off():
 
 # Update loop
 while True:
-    # --- Update metrics ---
+    # Update metrics
     with metrics_container:
         st.metric("Temperature", sensor_data['temperature'])
         st.metric("Humidity", sensor_data['humidity'])
         st.metric("Air Quality Alert", sensor_data['air_quality_alert'])
         st.metric("Gas Leak Alert", sensor_data['gas_leak_alert'])
 
-    # --- Update chart ---
+    # Update chart
     with chart_container:
         if history:
             df = pd.DataFrame(list(history))
             st.line_chart(df[['temperature', 'humidity', 'gas_leak_alert']])
 
-    # --- Update alerts ---
+    # Update alerts
     with alerts_container:
         temp = sensor_data['temperature']
         humidity = sensor_data['humidity']
