@@ -7,6 +7,8 @@ import streamlit as st
 import pandas as pd
 from collections import deque
 
+# -------------------------------------------------------------
+
 # GPIO setup
 GPIO.setmode(GPIO.BCM)
 
@@ -17,6 +19,8 @@ PMS7003_PIN = 27 # PMS7003 alert digital output
 
 GPIO.setup(MQ135_PIN, GPIO.IN)
 GPIO.setup(PMS7003_PIN, GPIO.IN)
+
+# -------------------------------------------------------------
 
 # DHT22 reading function
 def read_dht22():
@@ -49,6 +53,8 @@ sensor_data = {
 # Keep last N readings for AI prediction
 history = deque(maxlen=25)
 
+# -------------------------------------------------------------
+
 # Reading the sensors, thread 1
 def sensor_thread():
     global sensor_data, history
@@ -65,6 +71,8 @@ def sensor_thread():
         history.append(sensor_data.copy())
 
         time.sleep(2) # reading interval
+
+# -------------------------------------------------------------
 
 # Moving average prediction, thread 2
 def ai_thread():
@@ -89,6 +97,8 @@ def ai_thread():
                 print("ALERT: PM2.5 predicted to be high!")
 
         time.sleep(5)  # prediction interval
+
+# -------------------------------------------------------------
 
 # Logging, thread 3
 def logging_thread():
@@ -119,6 +129,8 @@ def logging_thread():
                              ";".join(alerts)])
             f.flush()
             time.sleep(5)
+
+# -------------------------------------------------------------
 
 st.set_page_config(page_title="Indoor Air Quality Dashboard")
 st.title("Indoor Air Quality Monitoring")
@@ -156,3 +168,4 @@ while True:
             st.line_chart(df[['temperature', 'humidity', 'pm25_alert']])
 
     time.sleep(2)
+# -------------------------------------------------------------
