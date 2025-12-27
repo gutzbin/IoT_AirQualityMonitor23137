@@ -1,7 +1,9 @@
 import Adafruit_DHT
 import RPi.GPIO as GPIO
-import time
 import threading
+import csv
+import time
+import streamlit as st
 from collections import deque
 
 # GPIO setup
@@ -68,6 +70,11 @@ def ai_thread():
     global history, sensor_data
     while True:
         if len(history) > 1:
+            # Safe defaults for none values
+            temp = sensor_data['temperature'] if sensor_data['temperature'] is not None else 0
+            humidity = sensor_data['humidity'] if sensor_data['humidity'] is not None else 0
+            pm25 = sensor_data['pm25_alert']
+            
             # Simple moving average prediction
             avg_temp = sum([h['temperature'] for h in history if h['temperature'] is not None]) / len(history)
             avg_humidity = sum([h['humidity'] for h in history if h['humidity'] is not None]) / len(history)
@@ -82,35 +89,58 @@ def ai_thread():
 
         time.sleep(5)  # prediction interval
 
-# Streamlit dashboard, thread 3
-def dashboard_thread():
-    import streamlit as st
-    st.set_page_config(page_title="Indoor Air Quality Dashboard")
-    st.title("Indoor Air Quality Monitoring")
+# Logging, thread 3
+def logging_thread():
+    with open("iaq_log.csv", "a", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["timestamp", "temperature", "humidity", "pm25_alert", "ai_alerts"])
+        
+        while True:
+            # Safe defaults for none values
+            temp = sensor_data['temperature'] if sensor_data['temperature'] is not None else 0
+            humidity = sensor_data['humidity'] if sensor_data['humidity'] is not None else 0
+            pm25 = sensor_data['pm25_alert']  # digital, usually 0 or 1
+            
+            # Build alert message
+            alerts = []
+            if temp > 30:
+                alerts.append("High Temp")
+            if humidity > 70:
+                alerts.append("High Humidity")
+            if pm25 > 1:
+                alerts.append("High PM2.5")
+            
+            # Write current data and alerts
+            writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"),
+                             sensor_data['temperature'],
+                             sensor_data['humidity'],
+                             sensor_data['pm25_alert'],
+                             ";".join(alerts)])
+            f.flush()
+            time.sleep(5)
 
-    # Placeholders for live updates
-    temp_display = st.empty()
-    humidity_display = st.empty()
-    air_alert_display = st.empty()
-    pm_display = st.empty()
+st.set_page_config(page_title="Indoor Air Quality Dashboard")
+st.title("Indoor Air Quality Monitoring")
 
-    while True:
-        temp_display.metric("Temperature", sensor_data['temperature'])
-        humidity_display.metric("Humidity", sensor_data['humidity'])
-        air_alert_display.metric("Air Quality Alert", sensor_data['air_quality_alert'])
-        pm_display.metric("PM2.5 Alert", sensor_data['pm25_alert'])
-        time.sleep(2)
+# Placeholders
+temp_display = st.empty()
+humidity_display = st.empty()
+air_alert_display = st.empty()
+pm_display = st.empty()
 
-if __name__ == "__main__":
-    t1 = threading.Thread(target=sensor_thread, daemon=True)
-    t2 = threading.Thread(target=ai_thread, daemon=True)
-    t3 = threading.Thread(target=dashboard_thread, daemon=True)
+# Start threads
+t1 = threading.Thread(target=sensor_thread, daemon=True)
+t2 = threading.Thread(target=ai_thread, daemon=True)
+t3 = threading.Thread(target=logging_thread, daemon=True)
 
-    t1.start()
-    t2.start()
-    t3.start()
+t1.start()
+t2.start()
+t3.start()
 
-    while True:
-        time.sleep(1)
-
-
+# Streamlit update loop
+while True:
+    temp_display.metric("Temperature", sensor_data['temperature'])
+    humidity_display.metric("Humidity", sensor_data['humidity'])
+    air_alert_display.metric("Air Quality Alert", sensor_data['air_quality_alert'])
+    pm_display.metric("PM2.5 Alert", sensor_data['pm25_alert'])
+    time.sleep(2)
