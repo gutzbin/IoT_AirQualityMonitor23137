@@ -1,5 +1,3 @@
-streamlit
 Adafruit_DHT
-matplotlib
-numpy
-pandas
+RPi.GPIO
+streamlit
