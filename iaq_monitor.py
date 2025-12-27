@@ -4,6 +4,7 @@ import threading
 import csv
 import time
 import streamlit as st
+import pandas as pd
 from collections import deque
 
 # GPIO setup
@@ -46,7 +47,7 @@ sensor_data = {
 }
 
 # Keep last N readings for AI prediction
-history = deque(maxlen=10)
+history = deque(maxlen=25)
 
 # Reading the sensors, thread 1
 def sensor_thread():
@@ -137,10 +138,21 @@ t1.start()
 t2.start()
 t3.start()
 
-# Streamlit update loop
+# Streamlit layout
+metrics_container = st.container()
+chart_container = st.container()
+
+# Update loop
 while True:
-    temp_display.metric("Temperature", sensor_data['temperature'])
-    humidity_display.metric("Humidity", sensor_data['humidity'])
-    air_alert_display.metric("Air Quality Alert", sensor_data['air_quality_alert'])
-    pm_display.metric("PM2.5 Alert", sensor_data['pm25_alert'])
+    with metrics_container:
+        st.metric("Temperature", sensor_data['temperature'])
+        st.metric("Humidity", sensor_data['humidity'])
+        st.metric("Air Quality Alert", sensor_data['air_quality_alert'])
+        st.metric("PM2.5 Alert", sensor_data['pm25_alert'])
+
+    with chart_container:
+        if history:
+            df = pd.DataFrame(list(history))
+            st.line_chart(df[['temperature', 'humidity', 'pm25_alert']])
+
     time.sleep(2)
