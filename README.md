@@ -2,11 +2,11 @@
 
 ## Description
 
-A multithreaded IoT system that monitors indoor air quality using three sensors:
+A multithreaded IoT system project that monitors indoor air quality using three sensors:
 
-* DHT22 → Temperature & Humidity
-* MQ-135 → Air Quality / CO₂
-* PMS7003 → PM2.5
+* DHT22 -> Temperature & Humidity
+* MQ-135 -> Air Quality / CO₂
+* PMS7003 -> PM2.5
 
 It provides a live web dashboard via Streamlit, AI-based trend alerts, and logs data to `iaq_log.csv`.
 
@@ -14,9 +14,9 @@ It provides a live web dashboard via Streamlit, AI-based trend alerts, and logs 
 
 1. Connect the sensors to the Raspberry Pi:
 
-   * DHT22 → GPIO 4
-   * MQ-135 → GPIO 17
-   * PMS7003 → GPIO 27
+   * DHT22 -> GPIO 4
+   * MQ-135 -> GPIO 17
+   * PMS7003 -> GPIO 27
 
 2. Install dependencies:
 
