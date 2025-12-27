@@ -15,10 +15,10 @@ GPIO.setmode(GPIO.BCM)
 # Pins
 DHT_PIN = 4 # DHT22 data pin
 MQ135_PIN = 17 # MQ-135 digital output
-PMS7003_PIN = 27 # PMS7003 alert digital output
+MQ5_PIN = 27     # Flammable gas (DANGER)
 
 GPIO.setup(MQ135_PIN, GPIO.IN)
-GPIO.setup(PMS7003_PIN, GPIO.IN)
+GPIO.setup(MQ5_PIN, GPIO.IN)
 
 # -------------------------------------------------------------
 
@@ -36,9 +36,9 @@ def read_mq135():
     return {'air_quality_alert': value}
 
 # PMS7003 reading function
-def read_pm25():
-    value = GPIO.input(PMS7003_PIN) # HIGH if PM2.5 exceeds threshold
-    return {'pm25_alert': value}
+def read_mq5():
+    value = GPIO.input(MQ5_PIN)  # HIGH = gas leak
+    return {'gas_leak_alert': value}
 
 # -------------------------------------------------------------
 
@@ -47,11 +47,15 @@ sensor_data = {
     'temperature': None,
     'humidity': None,
     'air_quality_alert': 0,
-    'pm25_alert': 0
+    'gas_leak_alert': 0
 }
 
 # Keep last N readings for AI prediction
 history = deque(maxlen=25)
+
+ema_temp = None
+ema_humidity = None
+alpha = 0.3  # smoothing factor
 
 # -------------------------------------------------------------
 
@@ -60,12 +64,12 @@ def sensor_thread():
     global sensor_data, history
     while True:
         dht = read_dht22()
-        mq = read_mq135()
-        pm = read_pm25()
+        mq135 = read_mq135()
+        mq5 = read_mq5()
 
         sensor_data.update(dht)
-        sensor_data.update(mq)
-        sensor_data.update(pm)
+        sensor_data.update(mq135)
+        sensor_data.update(mq5)
 
         # Add data to history for AI
         history.append(sensor_data.copy())
@@ -74,29 +78,32 @@ def sensor_thread():
 
 # -------------------------------------------------------------
 
-# Moving average prediction, thread 2
+# Exponential moving average prediction, thread 2
 def ai_thread():
-    global history, sensor_data
-    while True:
-        if len(history) > 1:
-            # Safe defaults for none values
-            temp = sensor_data['temperature'] if sensor_data['temperature'] is not None else 0
-            humidity = sensor_data['humidity'] if sensor_data['humidity'] is not None else 0
-            pm25 = sensor_data['pm25_alert']
-            
-            # Simple moving average prediction
-            avg_temp = sum([h['temperature'] for h in history if h['temperature'] is not None]) / len(history)
-            avg_humidity = sum([h['humidity'] for h in history if h['humidity'] is not None]) / len(history)
-            avg_pm25 = sum([h['pm25_alert'] for h in history]) / len(history)
-            # Trigger alert if predicted temp/humidity exceeds thresholds
-            if avg_temp > 30:
-                print("ALERT: High temperature predicted!")
-            if avg_humidity > 70:
-                print("ALERT: High humidity predicted!")
-            if avg_pm25 > 1:  # 1 = HIGH digital reading from sensor
-                print("ALERT: PM2.5 predicted to be high!")
+    global ema_temp, ema_humidity, alpha, sensor_data
 
-        time.sleep(5)  # prediction interval
+    while True:
+        temp = sensor_data['temperature'] if sensor_data['temperature'] is not None else None
+        humidity = sensor_data['humidity'] if sensor_data['humidity'] is not None else None
+
+        if temp is not None:
+            if ema_temp is None:
+                ema_temp = temp
+            else:
+                ema_temp = alpha * temp + (1 - alpha) * ema_temp
+
+        if humidity is not None:
+            if ema_humidity is None:
+                ema_humidity = humidity
+            else:
+                ema_humidity = alpha * humidity + (1 - alpha) * ema_humidity
+
+        if ema_temp is not None and ema_temp > 30:
+            print("ALERT: High temperature predicted!")
+        if ema_humidity is not None and ema_humidity > 70:
+            print("ALERT: High humidity predicted!")
+
+        time.sleep(5) # reading interval
 
 # -------------------------------------------------------------
 
@@ -104,13 +111,14 @@ def ai_thread():
 def logging_thread():
     with open("iaq_log.csv", "a", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["timestamp", "temperature", "humidity", "pm25_alert", "ai_alerts"])
+        writer.writerow(["timestamp", "temperature", "humidity", "air_quality_alert", "gas_leak_alert", "ai_alerts"])
         
         while True:
             # Safe defaults for none values
             temp = sensor_data['temperature'] if sensor_data['temperature'] is not None else 0
             humidity = sensor_data['humidity'] if sensor_data['humidity'] is not None else 0
-            pm25 = sensor_data['pm25_alert']  # digital, usually 0 or 1
+            air = sensor_data['air_quality_alert'] # digital, 0 or 1
+            gas = sensor_data['gas_leak_alert'] # digital, 0 or 1
             
             # Build alert message
             alerts = []
@@ -118,20 +126,17 @@ def logging_thread():
                 alerts.append("High Temp")
             if humidity > 70:
                 alerts.append("High Humidity")
-            if pm25 > 1:
-                alerts.append("High PM2.5")
+            if air == 1:
+                alerts.append("Poor Air Quality")
+            if gas == 1:
+                alerts.append("Gas Leak")
             
             # Write current data and alerts
-            writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"),
-                             sensor_data['temperature'],
-                             sensor_data['humidity'],
-                             sensor_data['pm25_alert'],
-                             ";".join(alerts)])
+            writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), temp, humidity, air, gas, ";".join(alerts)])
             f.flush()
             time.sleep(5)
 
 # -------------------------------------------------------------
-
 st.set_page_config(page_title="Indoor Air Quality Dashboard")
 st.title("Indoor Air Quality Monitoring")
 
@@ -139,33 +144,114 @@ st.title("Indoor Air Quality Monitoring")
 temp_display = st.empty()
 humidity_display = st.empty()
 air_alert_display = st.empty()
-pm_display = st.empty()
+gas_display = st.empty()
 
-# Start threads
-t1 = threading.Thread(target=sensor_thread, daemon=True)
-t2 = threading.Thread(target=ai_thread, daemon=True)
-t3 = threading.Thread(target=logging_thread, daemon=True)
+# Alarm state
+gas_alarm_latched = False
+alerts = {
+    "temp": False,
+    "humidity": False,
+    "air": False,
+    "gas": False
+}
 
-t1.start()
-t2.start()
-t3.start()
-
-# Streamlit layout
+# Streamlit containers
 metrics_container = st.container()
 chart_container = st.container()
+alerts_container = st.container()
+
+# Optional: LED / buzzer pins
+BUZZER_PIN = 22
+LED_PIN = 23
+GPIO.setup(BUZZER_PIN, GPIO.OUT)
+GPIO.setup(LED_PIN, GPIO.OUT)
+
+def alarm_on():
+    GPIO.output(BUZZER_PIN, GPIO.HIGH)
+    GPIO.output(LED_PIN, GPIO.HIGH)
+
+def alarm_off():
+    GPIO.output(BUZZER_PIN, GPIO.LOW)
+    GPIO.output(LED_PIN, GPIO.LOW)
 
 # Update loop
 while True:
+    # --- Update metrics ---
     with metrics_container:
         st.metric("Temperature", sensor_data['temperature'])
         st.metric("Humidity", sensor_data['humidity'])
         st.metric("Air Quality Alert", sensor_data['air_quality_alert'])
-        st.metric("PM2.5 Alert", sensor_data['pm25_alert'])
+        st.metric("Gas Leak Alert", sensor_data['gas_leak_alert'])
 
+    # --- Update chart ---
     with chart_container:
         if history:
             df = pd.DataFrame(list(history))
-            st.line_chart(df[['temperature', 'humidity', 'pm25_alert']])
+            st.line_chart(df[['temperature', 'humidity', 'gas_leak_alert']])
+
+    # --- Update alerts ---
+    with alerts_container:
+        temp = sensor_data['temperature']
+        humidity = sensor_data['humidity']
+        air = sensor_data['air_quality_alert']
+        gas = sensor_data['gas_leak_alert']
+
+        # Advisory alerts
+        alerts["temp"] = temp is not None and temp > 30
+        alerts["humidity"] = humidity is not None and humidity > 70
+        alerts["air"] = air == 1
+
+        # Gas alarm latch
+        if gas == 1:
+            gas_alarm_latched = True
+            alerts["gas"] = True
+
+        # Display advisory messages
+        if alerts["temp"]:
+            st.warning("Temperature is high! Turn on a fan or improve ventilation.")
+        if alerts["humidity"]:
+            st.warning(
+                "Humidity is high! Consider ventilation or a dehumidifier."
+            )
+        if alerts["air"]:
+            st.warning(
+                "Air quality is poor! Open a window and point a fan toward it."
+            )
+
+        # Gas leak emergency
+        if gas_alarm_latched:
+            # Flash background red
+            st.markdown(
+                """
+                <style>
+                body {
+                    background-color: #8B0000;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+            st.error("GAS LEAK DETECTED — EVACUATE IMMEDIATELY!")
+            alarm_on()
+
+            # Button to stop alarm
+            if st.button("I have handled the situation"):
+                gas_alarm_latched = False
+                alerts["gas"] = False
+                alarm_off()
+                # Reset background color
+                st.markdown(
+                    """
+                    <style>
+                    body {
+                        background-color: white;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+        else:
+            alarm_off()
 
     time.sleep(2)
 # -------------------------------------------------------------
