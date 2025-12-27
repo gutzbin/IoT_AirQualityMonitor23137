@@ -35,7 +35,7 @@ def read_mq135():
     value = GPIO.input(MQ135_PIN) # HIGH if gas exceeds threshold
     return {'air_quality_alert': value}
 
-# PMS7003 reading function
+# MQ-5 reading function
 def read_mq5():
     value = GPIO.input(MQ5_PIN)  # HIGH = gas leak
     return {'gas_leak_alert': value}
@@ -137,6 +137,7 @@ def logging_thread():
             time.sleep(5)
 
 # -------------------------------------------------------------
+
 st.set_page_config(page_title="Indoor Air Quality Dashboard")
 st.title("Indoor Air Quality Monitoring")
 
