@@ -2,7 +2,10 @@
 
 ## Description
 
-A multithreaded IoT system project that monitors indoor air quality using three sensors:
+A multithreaded IoT project for Nile University of Egypt’s CSCI410: Introduction to IoT course, by Mazen Ahmed Sayed El-Mallah (ID no. 231000137).
+The project monitors indoor air quality in real time using multiple sensors.
+
+The system uses three sensors:
 
 * DHT22 -> Temperature & Humidity
 * MQ-135 -> Air Quality / CO₂
@@ -42,3 +45,15 @@ streamlit run iaq_monitor.py
 ## Dashboard
 
 Displays live values for: Temperature, Humidity, Air Quality Alert, PM2.5 Alert.
+
+## Sources
+
+The following sources were used to code the project. I included all research material here so anyone with no knowledge of the functionings of GPIO, Python multithreading, Streamlit, or how to use a RaspberryPi for projects, could self-learn by using these as a starting point.
+
+Raspberry Pi Projects: Physical Computing with Python - https://projects.raspberrypi.org/en/projects/physical-computing/
+Official Python Documentation: Threading - https://docs.python.org/3/library/threading.html#module-threading/
+Instructables: Raspberry Pi GPIO Python - https://www.instructables.com/Raspberry-Pi-Python-scripting-the-GPIO/
+Learn Streamlit Tutorials - https://streamlitpython.com/
+Random Nerd Tutorials: Raspberry Pi Projects - https://randomnerdtutorials.com/projects-raspberry-pi/
+SparkFun Python GPIO Tutorial - https://learn.sparkfun.com/tutorials/python-programming-tutorial-getting-started-with-the-raspberry-pi/
+Jeremy Morgan Adafruit IoT with Raspberry Pi - https://www.jeremymorgan.com/tutorials/raspberry-pi/how-to-iot-adafruit-raspberrypi/
