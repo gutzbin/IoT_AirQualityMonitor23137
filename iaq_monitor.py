@@ -179,8 +179,8 @@ def alarm_off():
 while True:
     # Update metrics
     with metrics_container:
-        st.metric("Temperature", sensor_data['temperature'])
-        st.metric("Humidity", sensor_data['humidity'])
+        st.metric("Temperature", f"{sensor_data['temperature']} °C")
+        st.metric("Humidity", f"{sensor_data['humidity']} %")
         st.metric("Air Quality Alert", sensor_data['air_quality_alert'])
         st.metric("Gas Leak Alert", sensor_data['gas_leak_alert'])
 
