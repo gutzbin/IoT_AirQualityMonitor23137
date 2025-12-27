@@ -10,8 +10,6 @@ A multithreaded IoT system that monitors indoor air quality using three sensors:
 
 It provides a live web dashboard via Streamlit, AI-based trend alerts, and logs data to `iaq_log.csv`.
 
----
-
 ## Setup
 
 1. Connect the sensors to the Raspberry Pi:
@@ -28,8 +26,6 @@ pip install Adafruit_DHT RPi.GPIO streamlit
 
 3. Save the Python file as `iaq_monitor.py`.
 
----
-
 ## Running
 
 ```bash
@@ -42,8 +38,6 @@ streamlit run iaq_monitor.py
   1. Sensor readings
   2. AI predictions & alerts
   3. Data logging
-
----
 
 ## Dashboard
 
