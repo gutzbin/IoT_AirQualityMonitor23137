@@ -46,6 +46,10 @@ streamlit run iaq_monitor.py
 
 Displays live values for: Temperature, Humidity, Air Quality Alert, PM2.5 Alert.
 
+## Block Diagram
+
+<img width="521" height="321" alt="IoT drawio" src="https://github.com/user-attachments/assets/207c1beb-f2c4-4291-a6c2-91182a77d0ba" />
+
 ## Sources
 
 The following sources were used to code the project. I included all research material here so anyone with no knowledge of the functionings of GPIO, Python multithreading, Streamlit, or how to use a RaspberryPi for projects, could self-learn by using these as a starting point.
