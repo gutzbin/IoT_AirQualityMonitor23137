@@ -5,6 +5,7 @@ import csv
 import time
 import streamlit as st
 import pandas as pd
+import os
 from collections import deque
 
 # -------------------------------------------------------------
@@ -16,9 +17,19 @@ GPIO.setmode(GPIO.BCM)
 DHT_PIN = 4 # DHT22 data pin
 MQ135_PIN = 17 # MQ-135 digital output
 MQ5_PIN = 27     # Flammable gas (DANGER)
+# DIP switch pins (test overrides)
+DIP_TEMP = 5
+DIP_HUMIDITY = 6
+DIP_AIR = 13
+DIP_GAS = 19
 
 GPIO.setup(MQ135_PIN, GPIO.IN)
 GPIO.setup(MQ5_PIN, GPIO.IN)
+
+GPIO.setup(DIP_TEMP, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(DIP_HUMIDITY, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(DIP_AIR, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(DIP_GAS, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 # -------------------------------------------------------------
 
@@ -109,10 +120,12 @@ def ai_thread():
 
 # Logging, thread 3
 def logging_thread():
+    file_exists = os.path.isfile("iaq_log.csv")
     with open("iaq_log.csv", "a", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["timestamp", "temperature", "humidity", "air_quality_alert", "gas_leak_alert", "ai_alerts"])
-        
+        if not file_exists:
+            writer.writerow(["timestamp", "temperature", "humidity", "air_quality_alert", "gas_leak_alert", "ai_alerts"])
+            
         while True:
             # Safe defaults for none values
             temp = sensor_data['temperature'] if sensor_data['temperature'] is not None else 0
@@ -138,6 +151,13 @@ def logging_thread():
 
 # -------------------------------------------------------------
 
+if "initialized" not in st.session_state:
+        st.session_state.initialized = True
+
+threading.Thread(target=sensor_thread, daemon=True).start()
+threading.Thread(target=ai_thread, daemon=True).start()
+threading.Thread(target=logging_thread, daemon=True).start()
+
 st.set_page_config(page_title="Indoor Air Quality Dashboard")
 st.title("Indoor Air Quality Monitoring")
 
@@ -161,26 +181,25 @@ metrics_container = st.container()
 chart_container = st.container()
 alerts_container = st.container()
 
-# LED & buzzer pins
-BUZZER_PIN = 22
+# LED pin
 LED_PIN = 23
-GPIO.setup(BUZZER_PIN, GPIO.OUT)
 GPIO.setup(LED_PIN, GPIO.OUT)
 
 def alarm_on():
-    GPIO.output(BUZZER_PIN, GPIO.HIGH)
     GPIO.output(LED_PIN, GPIO.HIGH)
 
 def alarm_off():
-    GPIO.output(BUZZER_PIN, GPIO.LOW)
     GPIO.output(LED_PIN, GPIO.LOW)
 
 # Update loop
-while True:
+try:
+    temp = sensor_data['temperature']
+    humidity = sensor_data['humidity']
+    
     # Update metrics
     with metrics_container:
-        st.metric("Temperature", f"{sensor_data['temperature']} °C")
-        st.metric("Humidity", f"{sensor_data['humidity']} %")
+        st.metric("Temperature", "—" if temp is None else f"{temp:.1f} °C")
+        st.metric("Humidity", "—" if humidity is None else f"{humidity:.1f} %")
         st.metric("Air Quality Alert", sensor_data['air_quality_alert'])
         st.metric("Gas Leak Alert", sensor_data['gas_leak_alert'])
 
@@ -192,18 +211,25 @@ while True:
 
     # Update alerts
     with alerts_container:
+        dip_temp = GPIO.input(DIP_TEMP)
+        dip_humidity = GPIO.input(DIP_HUMIDITY)
+        dip_air = GPIO.input(DIP_AIR)
+        dip_gas = GPIO.input(DIP_GAS)
+        
+        st.caption(f"DIP switches — Temp:{dip_temp} Hum:{dip_humidity} Air:{dip_air} Gas:{dip_gas}")
+        
         temp = sensor_data['temperature']
         humidity = sensor_data['humidity']
         air = sensor_data['air_quality_alert']
         gas = sensor_data['gas_leak_alert']
 
         # Advisory alerts
-        alerts["temp"] = temp is not None and temp > 30
-        alerts["humidity"] = humidity is not None and humidity > 70
-        alerts["air"] = air == 1
+        alerts["temp"] = (temp is not None and temp > 40) or dip_temp == 1
+        alerts["humidity"] = (humidity is not None and humidity > 70) or dip_humidity == 1
+        alerts["air"] = (air == 1) or dip_air == 1
 
         # Gas alarm latch
-        if gas == 1:
+        if gas == 1 or dip_gas == 1:
             gas_alarm_latched = True
             alerts["gas"] = True
 
@@ -218,7 +244,7 @@ while True:
             st.warning(
                 "Air quality is poor! Open a window and point a fan toward it."
             )
-
+        
         # Gas leak emergency
         if gas_alarm_latched:
             # Flash background red
@@ -240,6 +266,7 @@ while True:
                 gas_alarm_latched = False
                 alerts["gas"] = False
                 alarm_off()
+                time.sleep(0.3)
                 # Reset background color
                 st.markdown(
                     """
@@ -254,5 +281,7 @@ while True:
         else:
             alarm_off()
 
-    time.sleep(2)
+    st_autorefresh(interval=2000)  
+finally:
+    GPIO.cleanup()
 # -------------------------------------------------------------
