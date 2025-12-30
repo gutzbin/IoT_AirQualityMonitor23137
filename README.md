@@ -9,7 +9,7 @@ The system uses three sensors:
 
 * DHT22 -> Temperature & Humidity
 * MQ-135 -> Air Quality / CO₂
-* PMS7003 -> PM2.5
+* MQ-5 -> Flammable Gas
 
 It provides a live web dashboard via Streamlit, AI-based trend alerts, and logs data to `iaq_log.csv`.
 
@@ -19,7 +19,7 @@ It provides a live web dashboard via Streamlit, AI-based trend alerts, and logs 
 
    * DHT22 -> GPIO 4
    * MQ-135 -> GPIO 17
-   * PMS7003 -> GPIO 27
+   * MQ-5 -> GPIO 27
 
 2. Install dependencies:
 
