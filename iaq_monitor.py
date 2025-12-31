@@ -6,6 +6,7 @@ import time
 import streamlit as st
 import pandas as pd
 import os
+import paho.mqtt.client as mqtt
 from flask import Flask, jsonify
 from collections import deque
 
@@ -81,6 +82,11 @@ app = Flask(__name__)
 @app.route("/sensors")
 def get_sensors():
     return jsonify(sensor_data)
+
+# -------------------------------------------------------------
+
+mqtt_client = mqtt.Client()
+mqtt_client.connect("broker.hivemq.com", 1883, 60)  # public broker
 
 # -------------------------------------------------------------
 
@@ -165,6 +171,14 @@ def logging_thread():
 
 # -------------------------------------------------------------
 
+def mqtt_thread():
+    while True:
+        mqtt_client.publish("your/topic/iaq", str(sensor_data))
+        time.sleep(5)
+
+# -------------------------------------------------------------
+
+
 if "initialized" not in st.session_state:
         st.session_state.initialized = True
 
@@ -172,6 +186,7 @@ threading.Thread(target=sensor_thread, daemon=True).start()
 threading.Thread(target=ai_thread, daemon=True).start()
 threading.Thread(target=logging_thread, daemon=True).start()
 threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5000), daemon=True).start()
+threading.Thread(target=mqtt_thread, daemon=True).start()
 
 st.set_page_config(page_title="Indoor Air Quality Dashboard")
 st.title("Indoor Air Quality Monitoring")
