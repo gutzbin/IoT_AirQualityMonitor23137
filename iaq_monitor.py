@@ -6,6 +6,7 @@ import time
 import streamlit as st
 import pandas as pd
 import os
+from flask import Flask, jsonify
 from collections import deque
 
 # -------------------------------------------------------------
@@ -67,6 +68,19 @@ history = deque(maxlen=25)
 ema_temp = None
 ema_humidity = None
 alpha = 0.3  # smoothing factor
+
+# -------------------------------------------------------------
+
+app = Flask(__name__)
+
+@app.route("/sensors")
+def get_sensors():
+    return jsonify(sensor_data)
+app = Flask(__name__)
+
+@app.route("/sensors")
+def get_sensors():
+    return jsonify(sensor_data)
 
 # -------------------------------------------------------------
 
@@ -157,6 +171,7 @@ if "initialized" not in st.session_state:
 threading.Thread(target=sensor_thread, daemon=True).start()
 threading.Thread(target=ai_thread, daemon=True).start()
 threading.Thread(target=logging_thread, daemon=True).start()
+threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5000), daemon=True).start()
 
 st.set_page_config(page_title="Indoor Air Quality Dashboard")
 st.title("Indoor Air Quality Monitoring")
